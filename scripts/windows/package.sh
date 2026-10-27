@@ -51,8 +51,11 @@ mkdir -p "$BUNDLE"
 cp -R "$RELEASE_DIR/"* "$BUNDLE/"
 python3 "$ROOT/scripts/windows/bundle.py" stage \
   "$BUNDLE" "$STAGING" "$VERSION" "$ARCH" "$EXPECTED"
+python3 "$ROOT/scripts/windows/bundle.py" license "$ROOT/LICENSE" "$STAGING/license.rtf"
 wix build "$ROOT/scripts/windows/installer.wxs" \
+  -ext WixToolset.UI.wixext \
   -arch "$ARCH" \
+  -d "LicenseRtf=$(cygpath -w "$STAGING/license.rtf")" \
   -d "Version=$VERSION" \
   -d "UpgradeCode=$UPGRADE_CODE" \
   -d "ShortcutGuid=$SHORTCUT_GUID" \

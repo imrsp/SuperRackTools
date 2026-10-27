@@ -50,6 +50,30 @@ def stage_bundle(args):
     print(f'archive: {archive}')
 
 
+def write_license(source, destination):
+    """Render the repository license as plain RTF for the MSI license dialog."""
+    text = pathlib.Path(source).read_text(encoding='utf-8')
+    escaped = []
+    for char in text:
+        if char in '\\{}':
+            escaped.append('\\' + char)
+        elif char == '\n':
+            escaped.append('\\par\n')
+        elif char == '\t':
+            escaped.append('\\tab ')
+        elif ord(char) < 128:
+            escaped.append(char)
+        else:
+            encoded = char.encode('utf-16-le')
+            for (unit,) in struct.iter_unpack('<h', encoded):
+                escaped.append(f'\\u{unit}?')
+    pathlib.Path(destination).write_text(
+        r'{\rtf1\ansi\deff0{\fonttbl{\f0 Segoe UI;}}\uc1\f0\fs18 '
+        + ''.join(escaped) + '}',
+        encoding='ascii',
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -59,9 +83,14 @@ def main():
     stage = commands.add_parser("stage", help="Validate a copied runtime and create its ZIP")
     for name in ("bundle_dir", "staging_dir", "version", "arch", "machine"):
         stage.add_argument(name)
+    license_command = commands.add_parser("license", help="Convert the project license to RTF")
+    license_command.add_argument("source")
+    license_command.add_argument("destination")
     args = parser.parse_args()
     if args.command == "find":
         find_binary([args.release_dir, args.machine])
+    elif args.command == "license":
+        write_license(args.source, args.destination)
     else:
         stage_bundle([args.bundle_dir, args.staging_dir, args.version, args.arch, args.machine])
 

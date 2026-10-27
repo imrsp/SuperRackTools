@@ -12,10 +12,10 @@ class SafeFilePublisher {
   static Future<void> publishNoReplace(File staged, File target) async {
     final sourcePath = staged.absolute.path;
     final targetPath = target.absolute.path;
-    final result = Platform.isWindows
+    final linked = Platform.isWindows
         ? _linkWindows(sourcePath, targetPath)
         : _linkPosix(sourcePath, targetPath);
-    if (result != 0) {
+    if (!linked) {
       if (await target.exists()) {
         throw FileSystemException('目标文件已存在，请选择新文件名。', targetPath);
       }
@@ -23,7 +23,7 @@ class SafeFilePublisher {
     }
   }
 
-  static int _linkWindows(String sourcePath, String targetPath) {
+  static bool _linkWindows(String sourcePath, String targetPath) {
     final library = DynamicLibrary.open('kernel32.dll');
     final createHardLink = library
         .lookupFunction<
@@ -33,14 +33,15 @@ class SafeFilePublisher {
     final target = targetPath.toNativeUtf16();
     final source = sourcePath.toNativeUtf16();
     try {
-      return createHardLink(target, source, nullptr);
+      // Win32 BOOL is nonzero on success; POSIX link uses zero instead.
+      return createHardLink(target, source, nullptr) != 0;
     } finally {
       malloc.free(target);
       malloc.free(source);
     }
   }
 
-  static int _linkPosix(String sourcePath, String targetPath) {
+  static bool _linkPosix(String sourcePath, String targetPath) {
     final library = Platform.isMacOS
         ? DynamicLibrary.open('/usr/lib/libSystem.B.dylib')
         : DynamicLibrary.open('libc.so.6');
@@ -52,7 +53,7 @@ class SafeFilePublisher {
     final source = sourcePath.toNativeUtf8();
     final target = targetPath.toNativeUtf8();
     try {
-      return link(source, target);
+      return link(source, target) == 0;
     } finally {
       malloc.free(source);
       malloc.free(target);

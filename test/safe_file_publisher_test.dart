@@ -27,4 +27,65 @@ void main() {
       expect(await target.readAsString(), 'keep existing');
     },
   );
+
+  test('published file remains readable after staging cleanup', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'publisher-cleanup-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final staged = File('${directory.path}/暂存文件.tmp');
+    final target = File('${directory.path}/保存的会话.sprk');
+    final contents = List<int>.generate(1024, (index) => index % 256);
+    await staged.writeAsBytes(contents);
+
+    await SafeFilePublisher.publishNoReplace(staged, target);
+    await staged.delete();
+
+    expect(await target.readAsBytes(), contents);
+  });
+
+  test(
+    'missing staged file reports failure without creating a target',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'publisher-missing-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final staged = File('${directory.path}/missing.tmp');
+      final target = File('${directory.path}/result.sprk');
+
+      await expectLater(
+        SafeFilePublisher.publishNoReplace(staged, target),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(await target.exists(), isFalse);
+    },
+  );
+
+  test(
+    'real conflict preserves both existing target and new staged data',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'publisher-conflict-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final staged = File('${directory.path}/staged.tmp');
+      final target = File('${directory.path}/result.sprk');
+      await staged.writeAsString('new contents');
+      await target.writeAsString('original contents');
+
+      await expectLater(
+        SafeFilePublisher.publishNoReplace(staged, target),
+        throwsA(
+          isA<FileSystemException>().having(
+            (error) => error.message,
+            'message',
+            contains('目标文件已存在'),
+          ),
+        ),
+      );
+      expect(await target.readAsString(), 'original contents');
+      expect(await staged.readAsString(), 'new contents');
+    },
+  );
 }

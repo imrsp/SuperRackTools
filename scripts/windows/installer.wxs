@@ -1,4 +1,5 @@
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
     Name="SuperRackTools"
     Manufacturer="SuperRackTools"
@@ -7,6 +8,9 @@
     Scope="perMachine">
     <MajorUpgrade DowngradeErrorMessage="A newer version of SuperRackTools is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
 
     <Feature Id="Main" Title="SuperRackTools" Level="1">
       <ComponentGroupRef Id="ApplicationFiles" />
