@@ -1,0 +1,12 @@
+include: package:flutter_lints/flutter.yaml
+analyzer:
+  exclude:
+    - work/**
+    - build/**
+    - windows/**
+    - macos/**
+    - test/**
+linter:
+  rules:
+    prefer_const_constructors: true
+    avoid_print: true

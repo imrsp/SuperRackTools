@@ -1,0 +1,49 @@
+name: Publish release
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Semantic version read from pubspec.yaml
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  github-release:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: github-release-v${{ inputs.version }}
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Extract release notes
+        env:
+          RELEASE_TAG: v${{ inputs.version }}
+        run: >-
+          python3 scripts/release/extract_notes.py
+          --tag "$RELEASE_TAG"
+          --changelog CHANGELOG.md
+          --pubspec pubspec.yaml
+          --output release-notes.md
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: SuperRackTools-*
+          path: release-assets
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: SuperRackTools v${{ inputs.version }}
+          body_path: release-notes.md
+          files: release-assets/**/*
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          draft: false
+          prerelease: ${{ contains(inputs.version, '-') }}

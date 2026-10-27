@@ -1,0 +1,41 @@
+name: Build Windows packages
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  windows:
+    name: Windows (${{ matrix.arch }})
+    # Flutter and the ARM64 cross-build below require the VS 2022 generator.
+    # windows-latest can move to a different Visual Studio major version.
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          architecture: x64
+          cache: true
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+      - name: Check Windows toolchain
+        shell: pwsh
+        run: ./scripts/windows/check_toolchain.ps1
+      - name: Install WiX Toolset
+        shell: bash
+        run: bash scripts/windows/install_wix.sh
+      - name: Build and package ${{ matrix.arch }}
+        run: bash scripts/windows/package.sh "${{ matrix.arch }}"
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SuperRackTools-windows-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            dist/*-windows-${{ matrix.arch }}.msi
+            dist/*-windows-${{ matrix.arch }}.zip

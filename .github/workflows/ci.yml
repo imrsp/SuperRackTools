@@ -1,0 +1,94 @@
+name: Flutter CI
+on:
+  push:
+    branches: [main, beta]
+  pull_request:
+    branches: [main, beta]
+  workflow_dispatch:
+    inputs:
+      republish:
+        description: Rebuild and overwrite the current version's GitHub Release
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib
+      - run: flutter analyze
+      - run: flutter test
+      - name: Test Windows artifact bootstrap
+        run: python3 -m unittest discover -s scripts/windows -p "test_*.py"
+
+  windows:
+    name: Windows
+    needs: quality
+    uses: ./.github/workflows/build-windows.yml
+
+  macos:
+    name: macOS
+    needs: quality
+    uses: ./.github/workflows/build-macos.yml
+
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs: [quality, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all checks and builds to succeed
+        env:
+          QUALITY: ${{ needs.quality.result }}
+          WINDOWS: ${{ needs.windows.result }}
+          MACOS: ${{ needs.macos.result }}
+        run: |
+          for result in "$QUALITY" "$WINDOWS" "$MACOS"; do
+            if [[ "$result" != success ]]; then
+              echo "A required check failed, was cancelled, or was skipped."
+              exit 1
+            fi
+          done
+
+  prepare-release:
+    needs: quality
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.version.outputs.mode }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - id: version
+        name: Prepare release metadata
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPUBLISH: ${{ inputs.republish }}
+        shell: bash
+        run: bash scripts/release/prepare.sh
+
+  release:
+    needs: [ci-passed, prepare-release]
+    if: github.ref == 'refs/heads/main' && needs.prepare-release.outputs.mode != 'skip'
+    permissions:
+      actions: read
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.prepare-release.outputs.version }}

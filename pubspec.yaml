@@ -1,0 +1,24 @@
+name: super_rack_tools
+description: Cross-platform Waves SuperRack session channel editor.
+publish_to: none
+version: 2.0.0+1
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  file_picker: ^8.1.7
+  ffi: ^2.2.0
+  path: ^1.9.1
+  sqlite3: ^3.7.1
+  url_launcher: ^6.3.2
+  xml: ^7.1.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/app_icon.png
+    - assets/Empty Session.sprk

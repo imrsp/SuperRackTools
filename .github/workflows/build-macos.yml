@@ -1,0 +1,24 @@
+name: Build macOS package
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  macos:
+    name: macOS Universal
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: bash scripts/macos/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: SuperRackTools-macos-universal
+          path: |
+            dist/*.dmg
+            dist/*.zip
+
